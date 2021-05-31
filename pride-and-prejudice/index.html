@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="./pandp.js"></script>
+    <title>阅读APP</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        /* @media only screen and (min-width:768px) {} */
+        
+        #header {
+            height: 16%;
+            text-align: center;
+            border: 2px solid #000;
+            margin-top: 0;
+        }
+        
+        #header>h1 {
+            margin-top: 10px;
+        }
+        
+        #menu {
+            height: 10%;
+            margin-top: 1em;
+        }
+        
+        #menu>input {
+            height: 2.25rem;
+        }
+        
+        #menu>input[type="button"] {
+            width: 3.25rem;
+            font-size: larger;
+        }
+        
+        input#search_box {
+            /* margin-top: 10px; */
+            width: 50px;
+            height: 32px;
+            font-size: larger;
+        }
+        
+        #container {
+            background-color: #fffff3;
+            box-sizing: border-box;
+            margin: 2px auto 5px auto;
+            height: 70%;
+            overflow: scroll;
+            border: 2px solid #000;
+        }
+        
+        #container>h2 {
+            text-align: center;
+        }
+        
+        .common {
+            width: 75%;
+            margin: 2px auto;
+        }
+        
+        #footer {
+            /* border: 2px solid #000; */
+            height: 5%;
+            background-color: #0c0c0c;
+            line-height: 50px;
+            color: #eee;
+            text-indent: 2em;
+        }
+        
+        #text {
+            margin: auto 20px;
+        }
+        
+        #text>p {
+            margin: 20px auto;
+            text-indent: 2em;
+            cursor: pointer;
+        }
+        
+        input[type="number"] {
+            -moz-appearance: textfield;
+        }
+        
+        p#inputText {
+            color: #55ff55;
+            position: absolute;
+            box-sizing: border-box;
+            z-index: 2;
+        }
+        
+        div.inputField {
+            width: 100%;
+            position: relative;
+            height: 2.5rem;
+            background-color: #000;
+            box-sizing: border-box;
+            /* border-style: inset; */
+            border: thick inset;
+            /* border: rgb(5, 8, 197) solid 4px; */
+        }
+        
+        p#hint,
+        p#inputText {
+            height: 2.5rem;
+            font-size: 22px;
+            width: 100%;
+            position: absolute;
+            font-weight: bold;
+            overflow: hidden;
+        }
+        
+        p#hint {
+            z-index: 1;
+            color: #444;
+        }
+    </style>
+    <script>
+        "use strict";
+        /**
+         * 函数功能： 查找第一个中文，通过查文档知中文编码从4e00开始
+         * 参数： 字符串
+         * 返回值： 第一个中文的下标
+         **/
+        function findFirstZh(str) {
+            let i = 0;
+            while (str[i] < '\u4e00') ++i;
+            return i;
+        }
+        /**
+         * 函数功能： 格式化每一章，用对象封装起来， 对象有三个属性：标题，英文原文，中文翻译
+         * 参数： 章节内容的字符串
+         * 返回值： 封装好的对象
+         **/
+        function formatChapter(chapter) {
+            let ret = {};
+            let mid = findFirstZh(chapter);
+            let titleEnd = chapter.indexOf("\n");
+            ret.title = chapter.slice(0, titleEnd);
+            ret.en = chapter.slice(titleEnd + 1, mid);
+            ret.zh = chapter.slice(mid);
+            return ret;
+        }
+        /**
+         * 函数功能： 向dom里面追加节点， 
+         * 参数1： parent，需要追加内容的dom对象
+         * 参数2： elem，节点类型，例如：p，h1，ul
+         * 参数3： text，文本内容
+         * 返回值： 无
+         **/
+        function addElement(parent, elem, text) {
+            let pdom = document.createElement(elem);
+            pdom.textContent = text;
+            parent.appendChild(pdom);
+        }
+        /**
+         * 函数功能：分割段落 
+         * 参数： 章节内容的字符串
+         * 返回值：段落组成的数组 
+         **/
+        function parsePara(chapter) {
+            return chapter.split('\n');
+        }
+
+        function nonLetter(ch) {
+            return !('a' <= ch.toLowerCase() && ch.toLowerCase() <= 'z');
+        }
+
+        var paraIndex = 0;
+        var chapterArr = [];
+        var inputText = "";
+        var timer = 0;
+        var isInput = false;
+        window.onload = function() {
+            var app = document.getElementById("app");
+            if (window.innerWidth > 768)
+                app.style.width = window.innerWidth * 0.8 + "px";
+            else
+                app.style.width = window.innerWidth + "px";
+            app.style.height = window.innerHeight + "px";
+            let tmp = pandp;
+            let start = 0;
+            /**
+             * 拆分章节，不同的是我不在循环里面判断是否是最后一段，而是将最后一段单独拆分，
+             * 这样做的话就不需要每次循环都判断一次，整体的性能应该会有所提升
+             * 这里的indexOf和search的主要区别是search支持正则表达式，indexOf不支持正则表达式，
+             * 但是这里完全不需要用正则表达式，故我选择indexOf
+             * slice和substring的主要区别在于slice支持负索引，这里使用这两个函数都差不多
+             */
+            for (let i = 2; i < 62; ++i) {
+                let end = tmp.indexOf("Chapter " + i);
+                let chapter = tmp.slice(start, end);
+                chapterArr.push(formatChapter(chapter));
+                start = end;
+            }
+            chapterArr.push(formatChapter(tmp.slice(start, -1)));
+            let container = document.getElementById("container");
+            container.firstElementChild.textContent = chapterArr[0].title;
+            // addElement(container, "h2", chapterArr[0].title); // 显示标题
+            let para = parsePara(chapterArr[paraIndex].en); // 拆分段落
+            for (let i = 0; i < para.length; ++i) // 把每一段追加到container中
+                addElement(container.lastElementChild, "p", para[i]);
+
+            var search_box = document.getElementById("search_box");
+            var cursorPos = 0;
+
+            function showChapter(value) {
+                paraIndex = parseInt(value) - 1;
+                console.log(paraIndex)
+                if (paraIndex < 0 || paraIndex >= 61)
+                    alert("输入有误，请输入1-61之间的数字");
+                else {
+                    let container = document.getElementById("container");
+                    container.firstElementChild.innerText = chapterArr[paraIndex].title;
+                    container.lastElementChild.innerHTML = "";
+                    let para = parsePara(chapterArr[paraIndex].en); // 拆分段落
+                    for (let i = 0; i < para.length; ++i) // 把每一段追加到container中
+                        addElement(container.lastElementChild, "p", para[i]);
+                    container.scrollTop = 0;
+                    addEventListenerForP();
+                }
+            }
+
+            search_box.onkeydown = function(ev) {
+                if (ev.key == "Enter") {
+                    showChapter(this.value);
+                }
+            }
+
+            search_box.onchange = function(ev) {
+                showChapter(this.value);
+            }
+            var enBtn = document.getElementById("en");
+            enBtn.onclick = function() {
+                let container = document.getElementById("container");
+                container.firstElementChild.innerText = chapterArr[paraIndex].title;
+                container.lastElementChild.innerHTML = "";
+                let para = parsePara(chapterArr[paraIndex].en); // 拆分段落
+                for (let i = 0; i < para.length; ++i) // 把每一段追加到container中
+                    addElement(container.lastElementChild, "p", para[i]);
+                container.scrollTop = 0;
+                addEventListenerForP();
+
+            }
+            var zhBtn = document.getElementById("zh");
+            zhBtn.onclick = function() {
+                let container = document.getElementById("container");
+                container.firstElementChild.innerText = chapterArr[paraIndex].title;
+                container.lastElementChild.innerHTML = "";
+                let para = parsePara(chapterArr[paraIndex].zh); // 拆分段落
+                for (let i = 0; i < para.length; ++i) // 把每一段追加到container中
+                    addElement(container.lastElementChild, "p", para[i]);
+                container.scrollTop = 0;
+            }
+
+            function addEventListenerForP() {
+                var paras = document.querySelectorAll("#text>p");
+                // console.log(paras)
+                for (let i = 0; i < paras.length; ++i) {
+                    paras[i].id = i;
+                    // console.log(paras[i].isTranslate)
+                    if (!paras[i].isTranslate)
+                        paras[i].isTranslate = false;
+                    paras[i].addEventListener("click", function() {
+                        console.log("onclick")
+                        if (!this.isTranslate) {
+                            let zhparas = parsePara(chapterArr[paraIndex].zh);
+                            let zhtext = document.createTextNode("译文： " + zhparas[this.id]);
+                            let newLine = document.createElement("br");
+                            this.appendChild(newLine);
+                            this.appendChild(zhtext);
+                            this.isTranslate = true;
+                        }
+                    });
+                }
+            }
+            addEventListenerForP();
+            /*以下是input输入框*/
+            var inputP = document.querySelector("p#inputText");
+
+            inputP.addEventListener("click", function(ev) {
+                if (timer == 0) {
+                    timer = setInterval(function() {
+                        inputP.textContent = inputText.slice(0, cursorPos) + "_" + inputText.slice(cursorPos);
+                        setTimeout(function() {
+                            inputP.textContent = inputText;
+                        }, 400);
+                    }, 800);
+                    isInput = true;
+                }
+            });
+            document.body.addEventListener("click", function(ev) {
+                if (ev.target != document.querySelector("#inputText")) {
+                    clearInterval(timer);
+                    timer = 0;
+                    isInput = false;
+                    inputP.textContent = inputText;
+                }
+            });
+
+            function showHint(inputText) {
+                let hint = document.querySelector("#hint");
+                if (inputText == "") {
+                    hint.textContent = "";
+                    return;
+                }
+                let word = findWord(inputText);
+                if (word) {
+                    hint.textContent = word.en;
+                } else {
+                    hint.textContent = "";
+                }
+            }
+            const A = 65;
+            const Z = 90;
+            document.body.addEventListener("keydown", function(ev) {
+                // console.log(ev);
+                console.log(ev.key);
+                // console.log(ev.keyCode);
+                if (isInput) {
+                    let key = ev.key;
+                    if (A <= ev.keyCode && ev.keyCode <= Z) {
+                        // if (key.length == 1 && "a" <= key.toLowerCase() && key.toLowerCase() <= "z") {
+                        // inputText += key;
+                        inputText = inputText.slice(0, cursorPos) + key + inputText.slice(cursorPos);
+                        inputP.textContent = inputText;
+                        if (inputP.scrollWidth > inputP.clientWidth) {
+                            inputP.scrollLeft = inputP.clientWidth;
+                        }
+                        ++cursorPos;
+                        showHint(inputText);
+                    } else if (ev.key == "Backspace") {
+                        inputText = inputText.slice(0, cursorPos - 1 < 0 ? 0 : cursorPos - 1) + inputText.slice(cursorPos);
+                        inputP.textContent = inputText;
+                        if (cursorPos > 0)
+                            --cursorPos;
+                        showHint(inputText);
+                    } else if (ev.key == ' ' || ev.key == "-") {
+                        inputText = inputText.slice(0, cursorPos) + key + inputText.slice(cursorPos);
+                        inputP.textContent = inputText;
+                        ++cursorPos;
+                    } else if (ev.key == "Enter") {
+                        searchAll();
+                    } else if (ev.key == 'ArrowLeft') {
+                        if (cursorPos > 0)
+                            --cursorPos;
+                    } else if (ev.key == 'ArrowRight') {
+                        if (cursorPos < inputText.length)
+                            ++cursorPos;
+                    } else if (ev.key == "Tab") {
+                        let hint = document.querySelector("#hint");
+                        inputText = hint.textContent;
+                        cursorPos = hint.textContent.length;
+                        inputP.textContent = inputText;
+                    }
+                    console.log("cursor position：" + cursorPos);
+                }
+            });
+            var search_btn = document.querySelector("#search");
+
+            function searchAll(ev) {
+                let searchText = inputText;
+                if (inputText == "")
+                    return;
+                let paras = document.querySelectorAll("div#text>p");
+                // console.log(paras);
+                let count = 0;
+                let res = '';
+                let containerText = document.querySelector("div#text");
+                for (let i = 0; i < paras.length; ++i) {
+                    // console.log(paras[i]);
+                    let text = paras[i].textContent;
+                    let tagP = document.createElement("p");
+                    let j = -1;
+                    while ((j = text.toLowerCase().indexOf(searchText.toLowerCase())) != -1 && (!text[j + searchText.length] || nonLetter(text[j + searchText.length]))) {
+                        if (text[j - 1] && !nonLetter(text[j - 1]))
+                            break;
+                        let text1 = document.createTextNode(text.substring(0, j));
+                        let text2 = document.createElement("span");
+                        text2.textContent = text.substring(j, j + searchText.length);
+                        text2.style.backgroundColor = "#3390fd";
+                        text2.style.color = "#fff";
+                        tagP.appendChild(text1);
+                        tagP.appendChild(text2);
+                        text = text.substring(j + searchText.length);
+                        ++count;
+                    }
+                    let text3 = document.createTextNode(text);
+                    tagP.appendChild(text3);
+                    // console.log(paras[i].translate);
+                    tagP.isTranslate = paras[i].isTranslate;
+                    containerText.removeChild(paras[i]);
+                    containerText.appendChild(tagP);
+
+                }
+                addEventListenerForP();
+                alert("搜索到" + count + "个结果")
+            }
+            search_btn.addEventListener("click", searchAll);
+        }
+    </script>
+</head>
+
+<body>
+    <div id="app" class="common">
+        <div id="header">
+            <h1>Pride And Prejudice</h1>
+            <div id="menu">
+                <input type="button" value="英文" id="en">
+                <input type="button" value="中文" id="zh">
+                <input type="button" value="搜索" id="search">
+                <input type="button" value="词典" id="dict"> &nbsp;&nbsp;<strong>章节</strong>
+                <input type="number" name="search" id="search_box" value="1" min="1" max="61">
+            </div>
+        </div>
+        <div class="inputField">
+            <p id="inputText"></p>
+            <p id="hint"></p>
+        </div>
+        <div id="container" class="">
+            <h2></h2>
+            <div id="text">
+            </div>
+        </div>
+        <div id="footer">
+            2021.3.23 Version 1.0 By Liao Changlin
+        </div>
+    </div>
+</body>
+
+</html>
